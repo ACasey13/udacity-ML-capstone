@@ -1,0 +1,82 @@
+body {
+  background-color: #eeeeee;
+  font-family: sans-serif;
+}
+
+li {
+  margin-bottom: 10px;
+}
+
+.mystyle {
+    font-size: 11pt;
+    font-family: Arial;
+    border-collapse: collapse;
+    border: 1px solid silver;
+    text-align: center;
+
+}
+
+.mystyle td, th {
+    padding: 5px;
+}
+
+.mystyle tr:nth-child(even) {
+    background: #E0E0E0;
+}
+
+.mystyle tr:hover {
+    background: silver;
+    cursor: pointer;
+}
+
+.page {
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+  min-width: 400px;
+  max-width: 1200px;
+  //padding-left: 100px;
+  //padding-right: 100px;
+  padding: 100 100 100 25;
+}
+
+#profile {
+  width: 50px;
+  height: 50px;
+  border-radius: 50px;
+  border: 0px solid black;
+  vertical-align: middle;
+}
+
+#author {
+  display: inline;
+  margin-left: .5em;
+}
+
+.content {
+  margin-top: 40px;
+}
+
+.file {
+  background-color: #dddddd;
+  font-family: monospace;
+  font-size: 1.2em;
+}
+
+ul {
+  list-style-type: none;
+}
+
+.header {
+  padding: 0px 100px;
+}
+
+a {
+  color: #227fd2;
+  text-decoration: none;
+
+}
+
+a:hover {
+  color: #26547c;
+}

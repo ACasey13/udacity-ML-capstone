@@ -1,1 +1,4 @@
 data/*
+toy_examples.ipynb
+test_preds.csv
+.ipynb_checkpoints*
