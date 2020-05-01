@@ -82,6 +82,15 @@ a {
 
 }
 
+@media print{
+  body{ background-color:#FFFFFF; background-image:none; color:#000000 }
+  .page{ width:100%;
+         max-width: 10000px;
+         padding: 0px;
+         margin: 0px;
+       }
+}
+
 a:hover {
   color: #26547c;
 }
