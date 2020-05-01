@@ -92,7 +92,7 @@ memory usage: 2.4+ GB
   <li><span class="file">CAMEO_INTL_2015</span> international classification -- not described, contains nans and odd category 'XX', more investigation required</li>
   <li><span class="file">D19_LETZTER_KAUF_BRANCHE</span> not described, translation is "last purchase industry", looks like it is the titles for the other D19 columns</li>
   <li><span class="file">EINGEFUEGT_AM</span> not described, translation is "inserted on" -- these are dates, should convert to datetime and, for now, keep just the year</li>
-  <li><span class="file">OST_WEST_KZ</span> flag indicating former east (O) or west (W) germany, unknown is -1. -- convert to categorical</li>
+  <li><span class="file">OST_WEST_KZ</span> flag indicating former east (O) or west (W) Germany, unknown is -1. -- convert to categorical</li>
   <li><span class="file">PRODUCT_GROUP</span> (only present in CUSTOMER data) not described, contains three groups: FOOD, COSMETIC, COSMETIC AND FOOD -- convert to categorical</li>
   <li><span class="file">CUSTOMER_GROUP</span> (only present in CUSTOMER data) not described, contains either MULTI_BUYER or SINGLE_BUYER -- convert to categorical</li>
 </ul>
@@ -176,7 +176,7 @@ print(len(azdias['LNR']))
   891221
 </pre>
 
-<p>For LNR the number of unique entries is identical to the number of entries so it is likely an identification number. In fact, this is confirmed later when I submit the predictions to <a href="https://www.kaggle.com/c/udacity-arvato-identify-customers/overview">Kaggle</a> becuase LNR is used to identify each prediction.</p>
+<p>For LNR the number of unique entries is identical to the number of entries so it is likely an identification number. In fact, this is confirmed later when I submit the predictions to <a href="https://www.kaggle.com/c/udacity-arvato-identify-customers/overview">Kaggle</a> because LNR is used to identify each prediction.</p>
 
 <p>Moving on to the next many-valued feature; GEBURTSJAHR is the year of birth. Upon inspection we can see that there are quite of few entries with a value of zero.</p>
 
@@ -197,7 +197,7 @@ Customers
 Name: GEBURTSJAHR, dtype: int64
 </pre>
 
-<p>As seen above, there are 93024 enties in the customer data without a birth year. It will probably be a good idea to keep these either as zero or use an imputation strategy and append an additional column indicating if the birth year is known. I'll develop another class to drop the LNR column and provide an imputation method for the birth year.</p>
+<p>As seen above, there are 93024 entries in the customer data without a birth year. It will probably be a good idea to keep these either as zero or use an imputation strategy and append an additional column indicating if the birth year is known. I'll develop another class to drop the LNR column and provide an imputation method for the birth year.</p>
 
 <pre><code class="language-python">
 class DropAndImputeBirthYear(BaseEstimator, TransformerMixin):
@@ -259,7 +259,7 @@ print('Percent of values missing per column:')
   dtype: float64
 </pre>
 
-<p>As seen, there are many fields missing more than 30% of their values. However, this is still potentially an underestimate. You see, for many of the fields the descriptions file has an identifier for "unknown". While not having data may indicate something, there should not be a difference between data that is <i>uknown because it is missing</i> and data that is <i>uknown because it is labelled</i> as uknown. To account for this I'll parse the descriptions file to get the uknown identifier for each field if it's available. Then I can really estimate how much data is misssing. </p>
+<p>As seen, there are many fields missing more than 30% of their values. However, this is still potentially an underestimate. You see, for many of the fields the descriptions file has an identifier for "unknown". While not having data may indicate something, there should not be a difference between data that is <i>unknown because it is missing</i> and data that is <i>unknown because it is labelled</i> as unknown. To account for this I'll parse the descriptions file to get the unknown identifier for each field if it's available. Then I can really estimate how much data is missing. </p>
 
 <pre><code class="language-python">
 description_filepath = './DIAS Attributes - Values 2017.xlsx'
@@ -285,7 +285,7 @@ def get_unknown_indicators(df):
     return attrs, unknown_map
 </code> </pre>
 
-<p>Now, I can grab all of the uknown indicators. Additionally, I can see which features do not have descriptions and also which see which attributes are in the descriptions file but are not found in the data.</p>
+<p>Now, I can grab all of the unknown indicators. Additionally, I can see which features do not have descriptions and also which see which attributes are in the descriptions file but are not found in the data.</p>
 
 <pre><code class="language-python">
 attrs, u_map = get_unknown_indicators(desc)
@@ -386,7 +386,7 @@ pp = pp.loc[keep_rows_pop]
   number of rows with less than 30% of data missing: 785420
 </pre>
 
-<p>At this point there are 354 features and it looks like with the exception of birth year each feature is categorical (in fact, birth year <i>could</i> be considered categroical as well). There is still a lot more work that could be done to clean and process the data, however, because we don't yet know which items are important it doesn't make sense to invest a lot of time massaging the features. Time would be better spent producing some rough models to gain insights into relevant features and then looping back for additional data processing. At this point I'll apply a simple imputation strategy to remove all null values. Now, with the data in a fully numeric representation I can begin modeling.</p>
+<p>At this point there are 354 features and it looks like with the exception of birth year each feature is categorical (in fact, birth year <i>could</i> be considered categorical as well). There is still a lot more work that could be done to clean and process the data, however, because we don't yet know which items are important it doesn't make sense to invest a lot of time massaging the features. Time would be better spent producing some rough models to gain insights into relevant features and then looping back for additional data processing. At this point I'll apply a simple imputation strategy to remove all null values. Now, with the data in a fully numeric representation I can begin modeling.</p>
 
 <pre><code class="language-python">
 impute_reduced_dfs = Imputer(strategy="most_frequent")
@@ -637,7 +637,7 @@ cut_t_red_imp = impute_reduced_dfs.transform(cc)
 
 <img src="./imgs/kmeans.svg" alt="kmeans result">
 
-<p>Now, we can start to see how nonsensical this analysis is and how difficult it is to interpret. We can see that the <span id="blue">blue</span> cluster mean is somewhere between yellow and red and between a horse and a pig. Between a horse and a pig? This has no meaning. Also, we can see that those individuals who responded with "yellow" and "monkey" have been grouped into this cluster. How could anyone interpret that? Keep in mind that for higher dimensional data creating mapping plots like these is difficult, if not impossible. Usually, at best, you can identify clusters at the extremeties of the principal comonent axes and then determine which featuers have the most effect on those axes.</p>
+<p>Now, we can start to see how nonsensical this analysis is and how difficult it is to interpret. We can see that the <span id="blue">blue</span> cluster mean is somewhere between yellow and red and between a horse and a pig. Between a horse and a pig? This has no meaning. Also, we can see that those individuals who responded with "yellow" and "monkey" have been grouped into this cluster. How could anyone interpret that? Keep in mind that for higher dimensional data creating mapping plots like these is difficult, if not impossible. Usually, at best, you can identify clusters at the extremities of the principal component axes and then determine which features have the most effect on those axes.</p>
 
 <p>There are a few more things to consider. I will admit that PCA and k-means could be an appropriate approach on categorical data if the data is <i>ordinal</i> (and, as it turns out, the Arvato data is mostly ordinal). But it is still hard to define constant distances between categories. For example, is the difference between medium and low the same as the difference between high and medium. And finally, I'm not saying that no one should ever do PCA and k-means on categorical data - but generally speaking there are better approaches.</p>
 
@@ -655,7 +655,7 @@ cut_t_red_imp = impute_reduced_dfs.transform(cc)
 
 <p>To identify pairs of highly correlative features I will use <a href="https://en.wikipedia.org/wiki/Cram%C3%A9r%27s_V">Cram&eacuter's V</a> - which is like a normalized chi-squared test between distributions. There is a nice introductory article about it <a href="https://towardsdatascience.com/the-search-for-categorical-correlation-a1cf7f1888c9">here</a>. </p>
 
-<p>But before that, there is one more nuance to consider. The problem is to segment the data and look for key deomgraphic differences between the general population and the current company customers. This problem is interesting because it doesn't have to be strictly unsupervised. Here are a few different approaches:</p>
+<p>But before that, there is one more nuance to consider. The problem is to segment the data and look for key demographic differences between the general population and the current company customers. This problem is interesting because it doesn't have to be strictly unsupervised. Here are a few different approaches:</p>
 
 <ol>
   <li>Combine the population and customer data and perform cluster analysis. Then "color" the clusters with an identifier: population or customer. Hopefully, one cluster will contain a disproportionate number of customers and you can see what makes that cluster different from the rest.</li>
@@ -663,7 +663,7 @@ cut_t_red_imp = impute_reduced_dfs.transform(cc)
   <li>Perform cluster analysis on the population data and then use the learned transformation to see in which clusters the customer data sit. </li>
 </ol>
 
-<p>I'll use the first approach and since I'm using a combined data set I will append a customer-population label. This has the added benefit that when using Cram&eacuter's V I can also identify which features strongly correlate with the label. Or, in other words, I can identify which features provide the most discrimination between the general population and the customer data. Using these featues should aid in segmenting out the customer data from the general population during the clustering analysis.</p>
+<p>I'll use the first approach and since I'm using a combined data set I will append a customer-population label. This has the added benefit that when using Cram&eacuter's V I can also identify which features strongly correlate with the label. Or, in other words, I can identify which features provide the most discrimination between the general population and the customer data. Using these features should aid in segmenting out the customer data from the general population during the clustering analysis.</p>
 
 <p>Here is the Cram&eacuter's V function:</p>
 <pre><code class="language-python">
@@ -784,7 +784,7 @@ for ix, (names, value) in enumerate(zip(features, values)):
 
 <p>It's also nice to see that the features that correlate well match our intuition. For example, LEBENSPHASE (life phase) and FAMILIE (family type), GREEN_AVANTGARDE (environmental sustainability) and PRAEGENDE_JUGENDJAHRE (dominating movement in the person's youth).</p>
 
-<p>Before selecting a short list of features I will look for a few more discriminative features using a niave measure of cross-entropy. Essentially, this will measure a difference between the way a feature is distributed between the population and customer data.</p>
+<p>Before selecting a short list of features I will look for a few more discriminative features using a naive measure of cross-entropy. Essentially, this will measure a difference between the way a feature is distributed between the population and customer data.</p>
 
 <pre><code class="language-python">
 cats = []
@@ -887,7 +887,7 @@ km.fit(combined[k_modes_features].values)
 </code> </pre>
 
 
-        <p>After running k-modes I can look to see how customer and population data sets were partioned accross clusters. In the plot below we can see that a disproportionate amount of customers fall in cluster 0.</p>
+        <p>After running k-modes I can look to see how customer and population data sets were partitioned across clusters. In the plot below we can see that a disproportionate amount of customers fall in cluster 0.</p>
 
         <img src="./imgs/clusters.svg" alt="assignment of population and customer data to clusters">
 
@@ -1021,7 +1021,7 @@ corr_columns = [
 ]
 </code> </pre>
 
-<p>Ok, I'd like to test a few different data tranformations. There are a lot of knobs to twist here:</p>
+<p>Ok, I'd like to test a few different data transformations. There are a lot of knobs to twist here:</p>
 
 <ul>
   <li>How many features to keep?</li>
@@ -1321,7 +1321,7 @@ run time: 4.372669800010044
 
 <p>One engineered feature I did consider was "Entry Date Year" minus "Birth Year". Birth year has moderate correlation with the label. The idea behind this feature is that the individual's age at the time of their response (or the entry year minus the birth year) would be better than the birth year alone. Unfortunately, this feature did not prove useful.</p>
 
-<p>With thi model in hand I submitted my results on the test set to Kaggle. The returned test set score was 0.79603. At the time of writing the top score was 0.81063.</p>
+<p>With this model in hand I submitted my results on the test set to Kaggle. The returned test set score was 0.79603. At the time of writing the top score was 0.81063.</p>
 
       </div>
 
