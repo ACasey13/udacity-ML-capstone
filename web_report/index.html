@@ -908,9 +908,420 @@ km.fit(combined[k_modes_features].values)
           <h2>Predictive Model: Data Pipeline and Model Tuning</h2>
         </div>
 
+<p>For the predictive model recall that we have been provided with two "MAILOUT" data files; one for training and one for testing.</p>
+
+<p>Each of the rows in the "MAILOUT" data files represents an individual that was targeted for a mailout campaign. Using the demographic information of each individual we would like to predict if they will respond to the campaign.</p>
+
+<p>The first thing I'll do is start fresh reading in the MAILOUT files and then double check that the data cleaning steps I identified in the segmentation task transfer to this task.</p>
+
+<pre><code class="language-python">
+mailout_train = pd.read_csv('./data/Udacity_MAILOUT_052018_TRAIN.csv', sep=';')
+mailout_test = pd.read_csv('./data/Udacity_MAILOUT_052018_TEST.csv', sep=';')
+</code> </pre>
+
+<p>It isn't stated anywhere in the descriptions of the data files, but interestingly, the mailout_train and mailout_test are all individuals currently contained the in customers data. So there is no benefit in trying to augment the data with the azdias or customers data.</p>
+
+<p>Ok, the first thing to do is to use the previously developed Cram&eacuter's V function to look for interesting properties in the training data (after taking care of the object dtypes and applying a simple imputation strategy, of course).</p>
+
+<pre><code class="language-python">
+imp = Imputer(strategy='most_frequent')
+columns = mailout_train.columns
+mailout_train = imp.fit_transform(mailout_train)
+
+nf = len(columns)
+cramer = np.zeros((nf,nf))
+for ix in np.arange(nf):
+    print('{}/{}'.format(ix, nf))
+    feature_1 = mailout_train[:,ix]
+    for jx in np.arange(ix, nf):
+        feature_2 = mailout_train[:,jx]
+        cramer[ix, jx] = cramers_v(feature_1, feature_2)
+
+# top n features that correlate with the target
+full_cramer = cramer + cramer.T - np.eye(cramer.shape[0])*cramer
+n = 30
+columns = np.asarray(columns)
+r_idx = np.where(columns == 'RESPONSE')[0].item()
+sorted_args = np.argsort(full_cramer[:,r_idx])[::-1]
+target_corr_names = columns[sorted_args]
+target_corr_values = full_cramer[sorted_args, r_idx]
+for ix, (name, value) in enumerate(zip(target_corr_names, target_corr_values)):
+    if ix > n+1:
+        break
+    print(str(name).ljust(30) + '{:1.5f}'.format(value).rjust(10))
+</code> </pre>
+
+<pre class="out">
+  RESPONSE                         0.99905
+  D19_SOZIALES                     0.09684
+  D19_KONSUMTYP_MAX                0.07666
+  D19_KONSUMTYP                    0.04359
+  ALTER_KIND4                      0.04042
+  RT_SCHNAEPPCHEN                  0.03557
+  KBA13_ANZAHL_PKW                 0.03006
+  ANZ_KINDER                       0.02976
+  D19_GARTEN                       0.02529
+  CAMEO_DEU_2015                   0.02382
+  ALTERSKATEGORIE_FEIN             0.02213
+  VK_DISTANZ                       0.02090
+  ALTER_KIND3                      0.01991
+  CAMEO_INTL_2015                  0.01986
+  LP_FAMILIE_GROB                  0.01925
+  PRAEGENDE_JUGENDJAHRE            0.01919
+  VERDICHTUNGSRAUM                 0.01875
+  LP_LEBENSPHASE_GROB              0.01870
+  ...
+</pre>
+
+<pre><code class="language-python">
+# sorted features with inter-feature correlation
+n=25
+ti = np.triu_indices(cramer.shape[0],1)
+corrs = np.argsort(cramer[ti])[::-1]
+features = [(columns[ti[0][i]], columns[ti[1][i]]) for i in corrs]
+values = [cramer[ti[0][i]][ti[1][i]] for i in corrs]
+for ix, (names, value) in enumerate(zip(features, values)):
+    if ix > n:
+        break
+    print(str(names).ljust(57) + '{:1.5f}'.format(value).rjust(10))
+</code> </pre>
+
+<pre class="out">
+('KBA13_FAB_SONSTIGE', 'KBA13_HERST_SONST')                 1.00000
+('GREEN_AVANTGARDE', 'PRAEGENDE_JUGENDJAHRE')               0.99985
+('LP_FAMILIE_GROB', 'LP_LEBENSPHASE_GROB')                  0.99864
+('LP_LEBENSPHASE_FEIN', 'LP_LEBENSPHASE_GROB')              0.99379
+('LP_FAMILIE_FEIN', 'LP_FAMILIE_GROB')                      0.99108
+('LP_FAMILIE_GROB', 'LP_LEBENSPHASE_FEIN')                  0.98692
+('LP_STATUS_FEIN', 'LP_STATUS_GROB')                        0.98681
+('KONSUMNAEHE', 'KONSUMZELLE')                              0.98585
+('LP_LEBENSPHASE_FEIN', 'LP_STATUS_GROB')                   0.95385
+('KBA13_KMH_211', 'KBA13_KMH_250')                          0.94505
+('KBA13_GBZ', 'PLZ8_GBZ')                                   0.94013
+('KBA13_HHZ', 'PLZ8_HHZ')                                   0.91357
+('SEMIO_KAEM', 'ANREDE_KZ')                                 0.88471
+('ALTERSKATEGORIE_FEIN', 'GEBURTSJAHR')                     0.87333
+...
+</pre>
+
+<p>We see similar trends as those we identified in the population-customers segmentation task. For now, I'll create a short list of important features.</p>
+
+<pre><code class="language-python">
+corr_columns = [
+'D19_SOZIALES',
+'D19_KONSUMTYP_MAX',
+'D19_KONSUMTYP',
+'ALTER_KIND4',
+'RT_SCHNAEPPCHEN',
+'KBA13_ANZAHL_PKW',
+'ANZ_KINDER',
+'D19_GARTEN',
+'CAMEO_DEU_2015',
+'ALTERSKATEGORIE_FEIN',
+]
+</code> </pre>
+
+<p>Ok, I'd like to test a few different data tranformations. There are a lot of knobs to twist here:</p>
+
+<ul>
+  <li>How many features to keep?</li>
+  <li>Add a missing indicator when applying the imputer.</li>
+  <li>Should some features be one hot encoded?</li>
+  <li>What about using PCA on the one hot encoded data to reduce the dimensionality and increase training speed?</li>
+</ul>
+
+<p>Additionally, it would be nice to search the model hyperparameter space. However, changes in the data transformation pipeline are <b>nested</b>. This means that there is a deep hierarchy of probability spaces to search - which is very expensive.</p>
+
+<p>To speed things up I'll generate a few different data representations and test them all on a basic gradient boosted model with cross-validation. Then I can tune the model hyperparameters on the best data representation.</p>
+
+<p>Here is the code to generate different representations of the data:</p>
+
+<pre><code class="language-python">
+class SelectColumns(BaseEstimator, TransformerMixin):
+    def __init__(self, cols='all', percent=.70, verbose=0):
+        self.cols = cols
+        self.per = percent
+        self.verbose = verbose
+
+    def fit(self, X, y):
+        if self.cols == 'all':
+            self.col = X.columns
+        else:
+            self.col = corr_columns
+        percent = X[self.col].isna().sum().sort_values(ascending=False)/len(X)
+        self.drop_cols = percent[percent>self.per].index
+        return self
+
+    def transform(self, X):
+        X = X.filter(self.col).copy()
+        if self.verbose:
+            print('in column transform')
+            print('keeping columns:')
+            print(self.cols)
+            print('dropping columns:')
+            print(self.drop_cols)
+        X = X.drop(self.drop_cols, axis=1)
+        return X.values
+
+def gen_datasets(data_params,
+                 X_train=mailout_train, X_test=mailout_test,
+                 y_tr=y_train, verbose=True):
+    X_train = X_train.copy()
+    X_test = X_test.copy()
+
+    sc = SelectColumns(data_params['columns'],
+                       data_params['percent'],
+                       verbose)
+    if verbose:
+        print('sc on train')
+    X_train = sc.fit_transform(X_train, y_tr)
+    if verbose:
+        print(X_train.shape)
+        print('sc on test')
+    X_test = sc.transform(X_test)
+
+    imp = Imputer(strategy='most_frequent',
+                  add_indicator=data_params['indicator'])
+
+    if verbose:
+        print('imp on train')
+    X_train = imp.fit_transform(X_train, y_tr)
+    if verbose:
+        print(X_train.shape)
+        print('imp on test')
+    X_test = imp.transform(X_test)
+
+    if data_params['ohe']:
+        ohe = OneHotEncoder(drop=data_params['drop'],
+                            sparse=False)
+        if verbose:
+            print('performing ohe')
+        train_idx = len(X_train)
+        combined = np.vstack((X_train, X_test))
+        combined = ohe.fit_transform(combined)
+        X_train = combined[:train_idx,:]
+        X_test = combined[train_idx:,:]
+
+        if verbose:
+            print(X_train.shape)
+
+    if data_params['pca']:
+        pca = PCA(n_components=data_params['n_comp'])
+        if verbose:
+            print('pca on train')
+        X_train = pca.fit_transform(X_train, y_tr)
+        if verbose:
+            print(X_train.shape)
+            print('pca on test')
+        X_test = pca.transform(X_test)
+
+    return X_train, X_test, y_tr
+  </code> </pre>
+
+  <p>Now I can define a few (9) different data representations.</p>
+
+  <pre><code class="language-python">
+  data_params = [{
+    'columns':'all',
+    'percent':.7,
+    'indicator':False,
+    'ohe':False,
+    'drop':None,
+    'pca':False,
+    'n_comp':.8
+},
+...
+  </code> </pre>
+
+  <p>Now that I have a few different versions of the data I can run them through a simple gradient boosting model to see which is best.</p>
+
+  <pre><code class="language-python">
+  from xgboost import XGBClassifier as GBC
+  from sklearn.model_selection import cross_val_score
+
+  def get_weight(y):
+      n_pos = np.sum(y)
+      n_negs = len(y) - n_pos
+      weight = n_negs/n_pos
+      print(weight)
+      return weight
+
+  weight = get_weight(y_train)
+  print(weight)
+
+  data_set_scores = []
+
+  for dset in data_sets:
+      X_train, X_test, y_tr = dset
+
+      skf = StratifiedKFold(n_splits=10,
+                            random_state=None,
+                            shuffle=True)
+      gbc = GBC(scale_pos_weight=weight,
+                verbosity=0, n_estimators=10000)
+
+      cv_results = []
+      f=0
+      for train_idx, test_idx in skf.split(X_train, y_tr):
+          f+=1
+          print('working on fold: {}'.format(f))
+          X_tr, X_te = X_train[train_idx], X_train[test_idx]
+          y_trr, y_tee = y_tr[train_idx], y_tr[test_idx]
+
+          gbc.fit(X_tr, y_trr, early_stopping_rounds=50,
+                                 eval_metric='auc',
+                                 eval_set=[[X_te, y_tee]],
+                                 verbose=False)
+
+          cv_preds = gbc.predict_proba(X_te)[:,1]
+          auc_score = roc_auc_score(y_tee, cv_preds)
+          print('auc_score: {}'.format(auc_score))
+          cv_results.append(auc_score)
+      cv_results = np.asarray(cv_results)
+      best_score = np.mean(cv_results)
+      std = np.std(cv_results)
+      print('-'*50)
+      print('mean score: {}'.format(best_score))
+      data_set_scores.append(best_score)
+      print('\n')
+  </code> </pre>
+
+  <pre class="out">
+...
+working on fold: 8
+auc_score: 0.7354110432721597
+working on fold: 9
+auc_score: 0.736845147835058
+working on fold: 10
+auc_score: 0.8023981785760342
+--------------------------------------------------
+mean score: 0.7682152649004823
+  </pre>
+
+  <p>Let's see how the data representation affected the untuned model's score.</p>
+
+  <img src="./imgs/data_trans_scores.svg" alt="comparison of data representation scores">
+
+  <p>Ok, now that I can see which data representation yields the best result I can proceed to further tune the model parameters. Data set 4 is the best but due to the one hot encoding there are a lot of features. To speed up the model training I'll used data representation number 3.</p>
+
+  <p>To tune the actual model I'll search the parameter space using a Bayesian optimization wrapper. I'll use the <a href="http://hyperopt.github.io/hyperopt/">Hyperopt</a> package to implement the search. Thanks to <a href="https://towardsdatascience.com/automated-machine-learning-hyperparameter-tuning-in-python-dfda59b72f8a">Will Koehrsen</a> for a great set of examples!</p>
+
+  <pre><code class="language-python">
+import csv
+
+# File to save first results
+out_file = 'gbm_trials.csv'
+of_connection = open(out_file, 'w')
+writer = csv.writer(of_connection)
+
+# Write the headers to the file
+writer.writerow(['auc_score', 'auc_std', 'params', 'iteration', 'train_time'])
+of_connection.close()
+
+# define the training data
+X_train, X_test, y_train = data_sets[3]
+  </code> </pre>
+
+  <pre><code class="language-python">
+from hyperopt import STATUS_OK
+from timeit import default_timer as timer
+
+iteration = 0
+def objective(params, n_folds=10, verbose=True):
+    """Objective function for Gradient Boosting Machine
+       Hyperparameter Tuning"""
+
+    global iteration
+    iteration += 1
+
+    p_save = params.copy()
+
+    # Perform n_fold cross validation with hyperparameters
+    for col in ['max_depth', 'n_estimators']:
+        params[col] = int(params[col])
+
+
+    gbc = GBC(**params, scale_pos_weight=weight,
+              verbosity=0)
+
+    start = timer()
+    cv_results = cross_val_score(gbc, X_train, y_train,
+                                 scoring='roc_auc',
+                                 cv=n_folds,
+                                 n_jobs=-1)
+    cv_results = np.asarray(cv_results)
+    best_score = np.mean(cv_results)
+    std = np.std(cv_results)
+    run_time = timer() - start
+    if verbose:
+        print('model: {:04d}, score: {:1.5f} +- {:1.5f}'.format(
+             iteration, best_score, std))
+        print('run time: {}'.format(run_time))
+
+    # Loss must be minimized
+    loss = 1 - best_score
+
+    of_connection = open(out_file, 'a')
+    writer = csv.writer(of_connection)
+    writer.writerow([best_score, std, p_save, iteration, run_time])
+    of_connection.close()
+
+    # Dictionary with information for evaluation
+    return {'loss': loss, 'params': params, 'status': STATUS_OK}
+  </code> </pre>
+
+  <pre><code class="language-python">
+from hyperopt import hp
+from hyperopt.pyll.stochastic import sample
+
+space = {'max_depth': hp.quniform('max_depth', 1,8,1),
+         'n_estimators': hp.quniform('n_estimators', 2,100,1),
+         'subsample': hp.uniform('subsample', .5, 1.),
+         'eta': hp.uniform('eta', .1, .4),
+         'colsample_bynode': hp.uniform('colsample_bynode', .5, 1.),
+         'lambda': hp.uniform('lambda', 1, 3),
+         'alpha': hp.uniform('alpha', 0, 3),
+         'gamma': hp.uniform('gamma', 0, 3)}
+
+from hyperopt import tpe
+tpe_algorithm = tpe.suggest
+from hyperopt import Trials
+bayes_trials = Trials()
+
+from hyperopt import fmin
+MAX_EVALS = 500
+# Optimize
+best = fmin(fn = objective, space = space, algo = tpe.suggest,
+            max_evals = MAX_EVALS, trials = bayes_trials)
+  </code> </pre>
+
+  <pre class="out">
+...
+model: 0498, score: 0.76138 +- 0.02851
+run time: 3.102780100001837
+model: 0499, score: 0.76445 +- 0.03454
+run time: 2.9164443999907235
+model: 0500, score: 0.74978 +- 0.02807
+run time: 4.372669800010044
+100%|██████████| 500/500 [32:27&lt;00:00,  3.89s/trial,
+                          best loss: 0.22945171090362504]
+  </pre>
+
+
+
         <div class="section" id="results">
           <h2>Results</h2>
         </div>
+
+<p>After a quick 30 minutes of hyperparameter optimization we can see how the model's cross-validation scores progressed over time.</p>
+
+<img src="./imgs/hyper_train.png" alt="model score during hyperparemter search">
+
+<p>You can see an early "exploration" region where the hyperparemters tested resulted in models with varied results. Then the algorithm slowly starts to track to an optimal setting. However, it looks like there is a hard limit on the achievable score. And alas, this "best" score isn't much better than the simple untuned model on most of the data representation we tried. This demonstrates that while the data is <i>clean</i> (numericalized, imputed, moderately transformed), hyperparameter tuning can only do so much. To get past this barrier will require some clever feature engineering.</p>
+
+<p>One engineered feature I did consider was "Entry Date Year" minus "Birth Year". Birth year has moderate correlation with the label. The idea behind this feature is that the individual's age at the time of their response (or the entry year minus the birth year) would be better than the birth year alone. Unfortunately, this feature did not prove useful.</p>
+
+<p>With thi model in hand I submitted my results on the test set to Kaggle. The returned test set score was 0.79603. At the time of writing the top score was 0.81063.</p>
 
       </div>
 
